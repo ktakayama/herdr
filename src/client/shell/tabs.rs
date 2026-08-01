@@ -23,8 +23,9 @@ pub(crate) fn render_tab_bar(
         .collect::<Vec<_>>();
     let desired_widths = tabs
         .iter()
-        .map(|tab| {
-            let label = tab_label(tab);
+        .enumerate()
+        .map(|(index, tab)| {
+            let label = tab_label(tab, index + 1);
             display_width(&label).saturating_add(4).max(MIN_TAB_WIDTH)
         })
         .collect::<Vec<_>>();
@@ -92,7 +93,7 @@ pub(crate) fn render_tab_bar(
     let mut first_visible = None;
     let mut last_visible = None;
     for (index, tab) in tabs.iter().enumerate().skip(*tab_scroll) {
-        let name = tab_label(tab);
+        let name = tab_label(tab, index + 1);
         let desired = desired_widths[index];
         let remaining = tab_right.saturating_sub(x);
         let width = desired.min(remaining);
@@ -377,10 +378,19 @@ fn last_visible_tab(start: usize, widths: &[u16], available: u16) -> Option<usiz
     last
 }
 
-fn tab_label(tab: &ClientShellTab) -> String {
-    if tab.zoomed {
-        format!("{} Z", tab.label)
+fn tab_label(tab: &ClientShellTab, position: usize) -> String {
+    // Keep the switch_tab number readable once a tab has been given a name.
+    // `tab.number` is a stable per-tab identity that does not shift when other
+    // tabs close, so use the tab's current position among its workspace's tabs
+    // instead, matching what an auto-named tab's own label already shows.
+    let name = if tab.custom_label {
+        format!("{position}:{}", tab.label)
     } else {
         tab.label.clone()
+    };
+    if tab.zoomed {
+        format!("{name} Z")
+    } else {
+        name
     }
 }
