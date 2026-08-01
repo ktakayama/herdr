@@ -494,6 +494,7 @@ mod tests {
 
         run_git(&root, &["config", "user.email", "herdr@example.invalid"]);
         run_git(&root, &["config", "user.name", "Herdr Test"]);
+        run_git(&root, &["config", "commit.gpgsign", "false"]);
         run_git(&root, &["commit", "--allow-empty", "-m", "initial"]);
 
         let head_oid = git_rev_parse_verify(&root, "HEAD").unwrap();
