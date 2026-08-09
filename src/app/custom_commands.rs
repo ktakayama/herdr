@@ -223,7 +223,36 @@ impl App {
             crate::config::CustomCommandAction::PluginAction => self
                 .invoke_plugin_action_from_keybind(binding.command.clone(), selected_text)
                 .map_err(io::Error::other),
+            crate::config::CustomCommandAction::SendKey => self.send_key_to_focused_pane(binding),
         }
+    }
+
+    fn send_key_to_focused_pane(
+        &mut self,
+        binding: &crate::config::CustomCommandKeybind,
+    ) -> io::Result<()> {
+        let (code, modifiers) =
+            crate::config::parse_key_combo(&binding.command).ok_or_else(|| {
+                io::Error::other(format!("invalid send_key combo: {:?}", binding.command))
+            })?;
+        let ws_idx = self
+            .state
+            .active
+            .ok_or_else(|| io::Error::other("no active workspace"))?;
+        let pane_id = self
+            .state
+            .workspaces
+            .get(ws_idx)
+            .and_then(|ws| ws.focused_pane_id())
+            .ok_or_else(|| io::Error::other("no focused pane to send the key to"))?;
+        let runtime = self
+            .lookup_runtime_sender(ws_idx, pane_id)
+            .ok_or_else(|| io::Error::other("no focused pane to send the key to"))?;
+        let bytes = runtime.encode_terminal_key(crate::input::TerminalKey::new(code, modifiers));
+        if bytes.is_empty() || runtime.try_send_bytes(bytes::Bytes::from(bytes)).is_err() {
+            return Err(io::Error::other("no focused pane to send the key to"));
+        }
+        Ok(())
     }
 
     fn spawn_custom_popup_command(
