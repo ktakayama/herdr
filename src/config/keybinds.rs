@@ -83,6 +83,7 @@ pub enum CommandKeybindType {
     Pane,
     Popup,
     PluginAction,
+    SendKey,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -122,6 +123,7 @@ pub enum CustomCommandAction {
     Pane,
     Popup,
     PluginAction,
+    SendKey,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -751,6 +753,7 @@ fn append_custom_command_bindings(
             CommandKeybindType::Pane => CustomCommandAction::Pane,
             CommandKeybindType::Popup => CustomCommandAction::Popup,
             CommandKeybindType::PluginAction => CustomCommandAction::PluginAction,
+            CommandKeybindType::SendKey => CustomCommandAction::SendKey,
         };
         let (width, height) = if action == CustomCommandAction::Popup {
             (command.width, command.height)
@@ -1007,13 +1010,18 @@ fn reject_binding(
         if source == BindingSource::Default && registry.prefix_source == BindingSource::User {
             return true;
         }
-        let diag = format!(
-            "reserved keybinding: {field} = {:?} uses keys.prefix as the prefix-mode key; pressing the prefix twice sends a literal prefix key, so this binding is disabled",
-            binding.label
-        );
-        warn!(message = %diag, "config diagnostic");
-        diagnostics.push(diag);
-        return true;
+        // A user binding here explicitly overrides the built-in double-prefix
+        // passthrough (pressing the prefix twice sends a literal prefix key);
+        // only defaults are blocked from claiming this slot.
+        if source != BindingSource::User {
+            let diag = format!(
+                "reserved keybinding: {field} = {:?} uses keys.prefix as the prefix-mode key; pressing the prefix twice sends a literal prefix key, so this binding is disabled",
+                binding.label
+            );
+            warn!(message = %diag, "config diagnostic");
+            diagnostics.push(diag);
+            return true;
+        }
     }
 
     if let Some(first_binding) = registry.conflict(binding) {
@@ -1760,7 +1768,9 @@ close_tab = "X"
     }
 
     #[test]
-    fn prefix_rhs_equal_to_configured_prefix_is_rejected() {
+    fn user_prefix_rhs_equal_to_configured_prefix_overrides_literal_passthrough() {
+        // Pressing the prefix twice normally sends it through to the pane
+        // literally; an explicit user binding on that same combo overrides it.
         let config: Config = toml::from_str(
             r#"
 [keys]
@@ -1769,13 +1779,7 @@ help = "prefix+ctrl+a"
 "#,
         )
         .unwrap();
-        let diagnostics = config.collect_diagnostics();
-        assert!(config.keybinds().help.bindings.is_empty());
-        assert!(diagnostics.iter().any(|diag| {
-            diag.contains("reserved keybinding")
-                && diag.contains("keys.help")
-                && diag.contains("keys.prefix")
-        }));
+        assert!(!config.keybinds().help.bindings.is_empty());
 
         let config: Config = toml::from_str(
             r#"
@@ -1917,7 +1921,7 @@ navigate_workspace_down = "ctrl+a"
     }
 
     #[test]
-    fn custom_command_prefix_rhs_equal_to_configured_prefix_is_rejected() {
+    fn custom_command_prefix_rhs_equal_to_configured_prefix_overrides_literal_passthrough() {
         let config: Config = toml::from_str(
             r#"
 [keys]
@@ -1929,11 +1933,7 @@ command = "echo no"
 "#,
         )
         .unwrap();
-        let diagnostics = config.collect_diagnostics();
-        assert!(config.keybinds().custom_commands.is_empty());
-        assert!(diagnostics.iter().any(|diag| {
-            diag.contains("reserved keybinding") && diag.contains("keys.command[0].key")
-        }));
+        assert!(!config.keybinds().custom_commands.is_empty());
     }
 
     #[test]

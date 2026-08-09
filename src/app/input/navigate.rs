@@ -65,16 +65,6 @@ impl App {
             return;
         }
 
-        if self.state.is_prefix_key(&raw_key) {
-            if self.state.copy_mode_pane_is_focused() {
-                self.state.cancel_copy_mode(&self.terminal_runtimes);
-            }
-            if !self.pass_through_key_to_focused_pane(raw_key) {
-                leave_command_mode(&mut self.state);
-            }
-            return;
-        }
-
         if key.code == KeyCode::Esc {
             leave_command_mode(&mut self.state);
             return;
@@ -97,6 +87,18 @@ impl App {
             indexed_navigation_action(&self.state, &raw_key, BindingDispatch::Prefix)
         {
             self.execute_prefix_key_action(action);
+            return;
+        }
+
+        // Falls back here only when the user has not claimed prefix+prefix for
+        // another binding above; see reject_binding in config/keybinds.rs.
+        if self.state.is_prefix_key(&raw_key) {
+            if self.state.copy_mode_pane_is_focused() {
+                self.state.cancel_copy_mode(&self.terminal_runtimes);
+            }
+            if !self.pass_through_key_to_focused_pane(raw_key) {
+                leave_command_mode(&mut self.state);
+            }
             return;
         }
 
@@ -799,6 +801,22 @@ impl App {
             crate::config::CustomCommandAction::PluginAction => self
                 .invoke_plugin_action_from_keybind(binding.command.clone())
                 .map_err(std::io::Error::other),
+            crate::config::CustomCommandAction::SendKey => {
+                match crate::config::parse_key_combo(&binding.command) {
+                    Some((code, modifiers)) => {
+                        if self.pass_through_key_to_focused_pane(TerminalKey::new(code, modifiers))
+                        {
+                            Ok(())
+                        } else {
+                            Err(std::io::Error::other("no focused pane to send the key to"))
+                        }
+                    }
+                    None => Err(std::io::Error::other(format!(
+                        "invalid send_key combo: {:?}",
+                        binding.command
+                    ))),
+                }
+            }
         };
         match result {
             Ok(()) => finish_custom_command_context(&mut self.state, context, previous_mode),
