@@ -562,11 +562,6 @@ impl ClientShellState {
                 } else {
                     ClientShellMode::Terminal
                 };
-                if crate::config::terminal_key_matches_combo(key, self.config.keybinds.prefix) {
-                    self.mode = return_mode;
-                    outcome.repaint = true;
-                    return self.focused_pane_id().map(ClientInputTarget::Pane);
-                }
                 if key.code == KeyCode::Esc {
                     self.mode = return_mode;
                     outcome.repaint = true;
@@ -579,6 +574,13 @@ impl ClientShellState {
                     outcome.repaint = true;
                     self.record_binding(binding, outcome);
                     return None;
+                }
+                // Falls back here only when the user has not claimed prefix+prefix for
+                // another binding above; see reject_binding in config/keybinds.rs.
+                if crate::config::terminal_key_matches_combo(key, self.config.keybinds.prefix) {
+                    self.mode = return_mode;
+                    outcome.repaint = true;
+                    return self.focused_pane_id().map(ClientInputTarget::Pane);
                 }
                 self.mode = return_mode;
                 outcome.repaint = true;

@@ -214,6 +214,9 @@ impl ClientShellConfig {
                             crate::protocol::ClientShellCommandAction::PluginAction => {
                                 crate::config::CommandKeybindType::PluginAction
                             }
+                            crate::protocol::ClientShellCommandAction::SendKey => {
+                                crate::config::CommandKeybindType::SendKey
+                            }
                             crate::protocol::ClientShellCommandAction::Unknown => return None,
                         };
                         Some(crate::config::CommandKeybindConfig {
