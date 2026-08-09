@@ -28,6 +28,7 @@ fn render_bottom_bar(frame: &mut Frame, area: Rect, line: Line<'_>, bg: ratatui:
     frame.render_widget(Paragraph::new(line), area);
 }
 
+#[allow(dead_code)] // kept unused: the bottom prefix help bar is intentionally skipped
 pub(super) fn render_prefix_overlay(app: &AppState, frame: &mut Frame, area: Rect) {
     let key = Style::default()
         .fg(app.palette.accent)
