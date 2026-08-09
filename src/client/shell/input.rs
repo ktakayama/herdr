@@ -584,11 +584,6 @@ impl ClientShellState {
                 } else {
                     ClientShellMode::Terminal
                 };
-                if self.config.keybinds.matches_prefix(key) {
-                    self.mode = return_mode;
-                    outcome.repaint = true;
-                    return self.focused_pane_id().map(ClientInputTarget::Pane);
-                }
                 if key.code == KeyCode::Esc {
                     self.mode = return_mode;
                     outcome.repaint = true;
@@ -601,6 +596,13 @@ impl ClientShellState {
                     outcome.repaint = true;
                     self.record_binding(binding, outcome);
                     return None;
+                }
+                // Falls back here only when the user has not claimed prefix+prefix for
+                // another binding above; see reject_binding in config/keybinds.rs.
+                if self.config.keybinds.matches_prefix(key) {
+                    self.mode = return_mode;
+                    outcome.repaint = true;
+                    return self.focused_pane_id().map(ClientInputTarget::Pane);
                 }
                 self.mode = return_mode;
                 outcome.repaint = true;
