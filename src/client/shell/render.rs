@@ -38,7 +38,13 @@ pub(super) fn render_mode_bar(
     keybinds: &LiveKeybindConfig,
     palette: &Palette,
 ) -> Option<Rect> {
-    if (mode == ClientShellMode::Terminal && endpoint_error.is_none()) || pane_area.is_empty() {
+    // Prefix mode intentionally shows no bar of its own: the PREFIX/esc/keybinds
+    // hint would blank out whatever is already drawn on this row (the bottom tab
+    // bar, or the pane's own last content line) while waiting for the second key
+    // of a prefix chord.
+    let hides_bar = matches!(mode, ClientShellMode::Terminal | ClientShellMode::Prefix)
+        && endpoint_error.is_none();
+    if hides_bar || pane_area.is_empty() {
         return None;
     }
 
@@ -68,7 +74,6 @@ pub(super) fn render_mode_bar(
             palette.accent
         })
         .add_modifier(Modifier::BOLD);
-    let prefix = crate::config::format_key_combo(keybinds.prefix);
     let prefix_rhs = |bindings: &crate::config::ActionKeybinds| {
         bindings
             .prefix_rhs_label()
@@ -83,20 +88,6 @@ pub(super) fn render_mode_bar(
         ]);
     } else {
         match mode {
-            ClientShellMode::Prefix => {
-                segments.extend([
-                    (" PREFIX ".to_owned(), mode_style),
-                    (" ".to_owned(), base),
-                    ("esc".to_owned(), key),
-                    (" cancel  ".to_owned(), base),
-                    (prefix, key),
-                    (" send prefix  ".to_owned(), base),
-                    (prefix_rhs(&keybinds.keybinds.workspace_picker), key),
-                    (" workspace nav  ".to_owned(), base),
-                    (prefix_rhs(&keybinds.keybinds.help), key),
-                    (" keybinds".to_owned(), base),
-                ]);
-            }
             ClientShellMode::Navigate => {
                 segments.extend([
                     (" NAVIGATE ".to_owned(), mode_style),
@@ -174,7 +165,7 @@ pub(super) fn render_mode_bar(
                     ]);
                 }
             }
-            ClientShellMode::Terminal => unreachable!(),
+            ClientShellMode::Terminal | ClientShellMode::Prefix => unreachable!(),
         }
     }
 
